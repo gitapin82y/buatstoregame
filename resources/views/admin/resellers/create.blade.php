@@ -7,10 +7,20 @@
 
 @section('content')
 <div class="row mt-4">
+    <div class="col-12 mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('admin.resellers.index') }}">Resellers</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Add New Reseller</li>
+            </ol>
+        </nav>
+    </div>
+    
     <div class="col-12">
         <div class="card shadow-sm">
             <div class="card-header">
-                <h5 class="card-title mb-0">Reseller Information</h5>
+                <h5 class="card-title mb-0">New Reseller Information</h5>
             </div>
             <div class="card-body">
                 <form action="{{ route('admin.resellers.store') }}" method="POST">
@@ -18,7 +28,7 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="name" class="form-label">Name</label>
+                            <label for="name" class="form-label">Full Name</label>
                             <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name') }}" required>
                             @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -26,8 +36,9 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="email" class="form-label">Email</label>
+                            <label for="email" class="form-label">Email Address</label>
                             <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" required>
+                            <small class="text-muted">The reseller will receive a welcome email at this address</small>
                             @error('email')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -49,14 +60,6 @@
                             @enderror
                         </div>
                         
-                        <div class="col-md-12 mb-3">
-                            <label for="store_description" class="form-label">Store Description</label>
-                            <textarea class="form-control @error('store_description') is-invalid @enderror" id="store_description" name="store_description" rows="3">{{ old('store_description') }}</textarea>
-                            @error('store_description')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
                         <div class="col-md-6 mb-3">
                             <label for="subdomain" class="form-label">Subdomain</label>
                             <div class="input-group">
@@ -65,6 +68,18 @@
                             </div>
                             <small class="text-muted">Only lowercase letters, numbers, and hyphens. Min 3 characters.</small>
                             @error('subdomain')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="store_description" class="form-label">Store Description (Optional)</label>
+                            <textarea class="form-control @error('store_description') is-invalid @enderror" id="store_description" name="store_description" rows="3">{{ old('store_description') }}</textarea>
+                            @error('store_description')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -81,12 +96,11 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="package_id" class="form-label">Package</label>
+                            <label for="package_id" class="form-label">Membership Package</label>
                             <select class="form-select @error('package_id') is-invalid @enderror" id="package_id" name="package_id" required>
-                                <option value="">Select a package</option>
                                 @foreach($packages as $package)
-                                    <option value="{{ $package->id }}" {{ old('package_id') == $package->id ? 'selected' : '' }}>
-                                        {{ $package->name }} - Rp {{ number_format($package->price, 0, ',', '.') }} ({{ $package->duration_days }} days)
+                                    <option value="{{ $package->id }}" data-duration="{{ $package->duration_days }}" {{ old('package_id') == $package->id ? 'selected' : '' }}>
+                                        {{ $package->name }} ({{ $package->level }} - {{ $package->duration_days }} days)
                                     </option>
                                 @endforeach
                             </select>
@@ -96,17 +110,20 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="duration_days" class="form-label">Duration (Days)</label>
+                            <label for="duration_days" class="form-label">Membership Duration (days)</label>
                             <input type="number" class="form-control @error('duration_days') is-invalid @enderror" id="duration_days" name="duration_days" value="{{ old('duration_days', 30) }}" min="30" required>
+                            <small class="text-muted">Minimum 30 days</small>
                             @error('duration_days')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
                     
-                    <div class="d-flex justify-content-end gap-2">
+                    <div class="d-flex justify-content-end gap-2 mt-4">
                         <a href="{{ route('admin.resellers.index') }}" class="btn btn-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-primary">Create Reseller</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus-circle me-1"></i> Create Reseller
+                        </button>
                     </div>
                 </form>
             </div>
@@ -118,7 +135,7 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        // Update subdomain based on store name
+        // Auto-generate subdomain from store name
         $('#store_name').on('blur', function() {
             if ($('#subdomain').val() === '') {
                 var storeName = $(this).val();
@@ -133,25 +150,24 @@
             }
         });
         
-        // Update duration based on package selection
+        // Update duration from package selection
         $('#package_id').on('change', function() {
-            var packageId = $(this).val();
-            var packageOption = $(this).find('option:selected');
-            var packageText = packageOption.text();
-            
-            // Extract membership level from package name (if contains "Gold" or "Silver")
-            if (packageText.includes('Gold')) {
+            var duration = $(this).find(':selected').data('duration');
+            $('#duration_days').val(duration);
+        });
+        
+        // Match membership level with package level
+        $('#package_id').on('change', function() {
+            var selectedPackage = $(this).find(':selected').text();
+            if (selectedPackage.includes('gold')) {
                 $('#membership_level').val('gold');
-            } else if (packageText.includes('Silver')) {
+            } else {
                 $('#membership_level').val('silver');
             }
-            
-            // Extract duration days from package text (match number followed by "days")
-            var durationMatch = packageText.match(/(\d+)\s*days/);
-            if (durationMatch && durationMatch[1]) {
-                $('#duration_days').val(durationMatch[1]);
-            }
         });
+        
+        // Initial setting based on default selection
+        $('#package_id').trigger('change');
     });
 </script>
 @endpush
