@@ -10,6 +10,21 @@ use Yajra\DataTables\Facades\DataTables;
 
 class MembershipPackageController extends Controller
 {
+
+    /**
+ * Get all packages for select options
+ */
+public function getPackages()
+{
+    $packages = MembershipPackage::select('id', 'name', 'level')
+        ->where('status', 'active')
+        ->get();
+        
+    return response()->json([
+        'success' => true,
+        'packages' => $packages
+    ]);
+}
     /**
      * Display a listing of the membership packages
      */

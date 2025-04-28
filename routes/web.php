@@ -84,20 +84,40 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'check.role:admin'])
     Route::resource('membership-packages', AdminMembershipPackageController::class);
     
     // Transaction Management
+    Route::get('/transactions/membership', [AdminTransactionController::class, 'membershipIndex'])->name('transactions.membership.index');
+    Route::get('/transactions/membership/{id}', [AdminTransactionController::class, 'membershipShow'])->name('transactions.membership.show');
+    
     Route::get('/transactions', [AdminTransactionController::class, 'index'])->name('transactions.index');
     Route::get('/transactions/{id}', [AdminTransactionController::class, 'show'])->name('transactions.show');
     Route::post('/transactions/{id}/process', [AdminTransactionController::class, 'process'])->name('transactions.process');
     Route::post('/transactions/{id}/update-status', [AdminTransactionController::class, 'updateStatus'])->name('transactions.update-status');
-    
-    // Membership Transaction Management
-    Route::get('/transactions/membership', [AdminTransactionController::class, 'membershipIndex'])->name('transactions.membership.index');
-    Route::get('/transactions/membership/{id}', [AdminTransactionController::class, 'membershipShow'])->name('transactions.membership.show');
     
     // Withdrawal Management
     Route::get('/withdrawals', [AdminWithdrawalController::class, 'index'])->name('withdrawals.index');
     Route::get('/withdrawals/{id}', [AdminWithdrawalController::class, 'show'])->name('withdrawals.show');
     Route::post('/withdrawals/{id}/approve', [AdminWithdrawalController::class, 'approve'])->name('withdrawals.approve');
     Route::post('/withdrawals/{id}/reject', [AdminWithdrawalController::class, 'reject'])->name('withdrawals.reject');
+
+    // Add to routes/web.php
+
+// Admin helper routes
+Route::get('/get-resellers', [AdminResellerController::class, 'getResellers'])->name('get-resellers');
+Route::get('/get-games', [AdminGameController::class, 'getGames'])->name('get-games');
+Route::get('/get-membership-packages', [AdminMembershipPackageController::class, 'getPackages'])->name('get-membership-packages');
+
+// Admin transaction exports
+Route::get('/transactions/export', [AdminTransactionController::class, 'export'])->name('transactions.export');
+Route::get('/transactions/membership/export', [AdminTransactionController::class, 'membershipExport'])->name('transactions.membership.export');
+
+// Admin payment check routes
+Route::post('/transactions/{id}/check-payment', [AdminTransactionController::class, 'checkPayment'])->name('transactions.check-payment');
+Route::post('/transactions/membership/{id}/check-payment', [AdminTransactionController::class, 'checkMembershipPayment'])->name('transactions.membership.check-payment');
+
+// Admin user management (missing route)
+Route::resource('/users', \App\Http\Controllers\Admin\UserController::class, ['as' => 'admin']);
+
+// Password reset for resellers
+Route::post('/resellers/{id}/reset-password', [AdminResellerController::class, 'resetPassword'])->name('resellers.reset-password');
 });
 
 // Reseller Routes

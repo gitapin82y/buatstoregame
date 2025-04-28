@@ -152,6 +152,38 @@ class ResellerController extends Controller
     }
 
     /**
+ * Get all resellers for select options
+ */
+public function getResellers()
+{
+    $resellers = ResellerProfile::with('user')
+        ->select('id', 'store_name')
+        ->get();
+        
+    return response()->json([
+        'success' => true,
+        'resellers' => $resellers
+    ]);
+}
+
+/**
+ * Send password reset link to reseller
+ */
+public function resetPassword($id)
+{
+    $reseller = User::findOrFail($id);
+    
+    // Generate reset token
+    $token = app('auth.password.broker')->createToken($reseller);
+    
+    // Send reset notification
+    $reseller->notify(new \Illuminate\Auth\Notifications\ResetPassword($token));
+    
+    return redirect()->back()
+        ->with('success', 'Password reset link has been sent to ' . $reseller->email);
+}
+
+    /**
      * Display the specified reseller
      */
     public function show($id)

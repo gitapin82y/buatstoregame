@@ -15,6 +15,20 @@
     class GameController extends Controller
 {
     /**
+ * Get all games for select options
+ */
+public function getGames()
+{
+    $games = Game::select('id', 'name')
+        ->where('status', 'active')
+        ->get();
+        
+    return response()->json([
+        'success' => true,
+        'games' => $games
+    ]);
+}
+    /**
      * Display a listing of the games
      */
     public function index(Request $request)

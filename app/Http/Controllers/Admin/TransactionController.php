@@ -12,6 +12,7 @@ use Yajra\DataTables\Facades\DataTables;
 
 class TransactionController extends Controller
 {
+    
     /**
      * Display a listing of the user transactions
      */
@@ -223,4 +224,200 @@ class TransactionController extends Controller
         
         return view('admin.transactions.membership-show', compact('transaction'));
     }
+
+    /**
+ * Export transactions to CSV
+ */
+public function export(Request $request)
+{
+    // Your export logic here
+    // For now, we'll create a simplified version
+    return response()->streamDownload(function () use ($request) {
+        $output = fopen('php://output', 'w');
+        
+        // Headers
+        fputcsv($output, [
+            'Invoice', 'Customer', 'Reseller', 'Game', 'Service', 'Amount', 
+            'Payment Status', 'Process Status', 'Date'
+        ]);
+        
+        // Query with filters
+        $transactions = UserTransaction::with(['user', 'reseller.user', 'game', 'service'])
+            ->when($request->filled('payment_status'), function ($q) use ($request) {
+                return $q->where('payment_status', $request->payment_status);
+            })
+            ->when($request->filled('process_status'), function ($q) use ($request) {
+                return $q->where('process_status', $request->process_status);
+            })
+            ->when($request->filled('reseller_id'), function ($q) use ($request) {
+                return $q->where('reseller_id', $request->reseller_id);
+            })
+            ->when($request->filled('game_id'), function ($q) use ($request) {
+                return $q->where('game_id', $request->game_id);
+            })
+            ->when($request->filled('date_from'), function ($q) use ($request) {
+                return $q->whereDate('created_at', '>=', $request->date_from);
+            })
+            ->when($request->filled('date_to'), function ($q) use ($request) {
+                return $q->whereDate('created_at', '<=', $request->date_to);
+            })
+            ->when($request->filled('search'), function ($q) use ($request) {
+                return $q->where('invoice_number', 'like', '%' . $request->search . '%')
+                    ->orWhereHas('user', function ($query) use ($request) {
+                        $query->where('name', 'like', '%' . $request->search . '%')
+                            ->orWhere('email', 'like', '%' . $request->search . '%');
+                    });
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        // Data
+        foreach ($transactions as $transaction) {
+            fputcsv($output, [
+                $transaction->invoice_number,
+                $transaction->user->name,
+                $transaction->reseller->store_name,
+                $transaction->game->name,
+                $transaction->service->name,
+                $transaction->amount,
+                $transaction->payment_status,
+                $transaction->process_status,
+                $transaction->created_at->format('Y-m-d H:i:s')
+            ]);
+        }
+        
+        fclose($output);
+    }, 'transactions-' . date('Y-m-d') . '.csv', [
+        'Content-Type' => 'text/csv',
+    ]);
+}
+
+/**
+ * Export membership transactions to CSV
+ */
+public function membershipExport(Request $request)
+{
+    // Similar to above but for membership transactions
+    return response()->streamDownload(function () use ($request) {
+        $output = fopen('php://output', 'w');
+        
+        // Headers
+        fputcsv($output, [
+            'Invoice', 'Reseller', 'Package', 'Level', 'Amount', 
+            'Payment Status', 'Date'
+        ]);
+        
+        // Query with filters
+        $transactions = MembershipTransaction::with(['reseller.user', 'package'])
+            ->when($request->filled('payment_status'), function ($q) use ($request) {
+                return $q->where('payment_status', $request->payment_status);
+            })
+            ->when($request->filled('package_id'), function ($q) use ($request) {
+                return $q->where('package_id', $request->package_id);
+            })
+            ->when($request->filled('reseller_id'), function ($q) use ($request) {
+                return $q->where('reseller_id', $request->reseller_id);
+            })
+            ->when($request->filled('date_from'), function ($q) use ($request) {
+                return $q->whereDate('created_at', '>=', $request->date_from);
+            })
+            ->when($request->filled('date_to'), function ($q) use ($request) {
+                return $q->whereDate('created_at', '<=', $request->date_to);
+            })
+            ->when($request->filled('search'), function ($q) use ($request) {
+                return $q->where('invoice_number', 'like', '%' . $request->search . '%')
+                    ->orWhereHas('reseller.user', function ($query) use ($request) {
+                        $query->where('name', 'like', '%' . $request->search . '%')
+                            ->orWhere('email', 'like', '%' . $request->search . '%');
+                    });
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        // Data
+        foreach ($transactions as $transaction) {
+            fputcsv($output, [
+                $transaction->invoice_number,
+                $transaction->reseller->store_name,
+                $transaction->package->name,
+                $transaction->package->level,
+                $transaction->amount,
+                $transaction->payment_status,
+                $transaction->created_at->format('Y-m-d H:i:s')
+            ]);
+        }
+        
+        fclose($output);
+    }, 'membership-transactions-' . date('Y-m-d') . '.csv', [
+        'Content-Type' => 'text/csv',
+    ]);
+}
+
+/**
+ * Check payment status for a transaction
+ */
+public function checkPayment($id)
+{
+    $transaction = UserTransaction::findOrFail($id);
+    
+    if ($transaction->payment_status !== 'pending') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This transaction is not in pending status.'
+        ]);
+    }
+    
+    // Here you would typically check with Xendit API
+    // For now, let's simulate a check
+    
+    if ($transaction->expired_at && $transaction->expired_at->isPast()) {
+        $transaction->update([
+            'payment_status' => 'expired'
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaction has expired.'
+        ]);
+    }
+    
+    return response()->json([
+        'success' => false,
+        'message' => 'Payment is still pending.'
+    ]);
+}
+
+/**
+ * Check payment status for a membership transaction
+ */
+public function checkMembershipPayment($id)
+{
+    $transaction = MembershipTransaction::findOrFail($id);
+    
+    if ($transaction->payment_status !== 'pending') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This transaction is not in pending status.'
+        ]);
+    }
+    
+    // Here you would typically check with Xendit API
+    // For now, let's simulate a check
+    
+    if ($transaction->expired_at && $transaction->expired_at->isPast()) {
+        $transaction->update([
+            'payment_status' => 'expired'
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaction has expired.'
+        ]);
+    }
+    
+    return response()->json([
+        'success' => false,
+        'message' => 'Payment is still pending.'
+    ]);
+}
 }
